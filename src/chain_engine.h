@@ -4,6 +4,7 @@
 #include "sqlite3.h"
 
 struct ChainEntry {
+    std::string anchor_text;
     std::string word;
     int         word_id;
     int         time_ms;

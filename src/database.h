@@ -40,7 +40,7 @@ struct ChainWord {
 struct WordPool {
     int         word_id;
     std::string word_text;
-    std::string category;
+    int         syllable;
 };
 
 // ── DB lifecycle ───────────────────────────────────────────
@@ -71,9 +71,10 @@ void chainword_insert(sqlite3* db, int chain_id, int seq, int word_id, int ms);
 std::vector<ChainWord> chainword_list(sqlite3* db, int chain_id);
 
 // ── WORDPOOL ──────────────────────────────────────────────
-int  wordpool_insert(sqlite3* db, const std::string& word, const std::string& category);
-int  wordpool_get_or_insert(sqlite3* db, const std::string& word, const std::string& category);
+int  wordpool_insert(sqlite3* db, const std::string& word, int syllable);
+int  wordpool_get_or_insert(sqlite3* db, const std::string& word, int syllable);
 int  wordpool_random_id(sqlite3* db);
 std::string wordpool_get_text(sqlite3* db, int word_id);
+int  wordpool_get_syllable(sqlite3* db, const std::string& word);
 std::vector<WordPool> wordpool_all(sqlite3* db);
 int  wordpool_count(sqlite3* db);

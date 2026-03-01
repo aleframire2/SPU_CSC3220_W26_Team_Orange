@@ -1,4 +1,5 @@
 #include "chain_engine.h"
+#include "colors.h"
 #include "database.h"
 #include <iostream>
 #include <string>
@@ -17,11 +18,20 @@
 #include <fcntl.h>
 #endif
 
-// ── cross-platform timed line input ───────────────────────
-// Returns the string typed, or "" if time ran out.
+static std::string to_lower(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+    return s;
+}
+
+// Cross-platform timed line input with live countdown.
+// Prints its own timer + prompt lines, returns typed string or "" on timeout.
 static std::string timed_input(int seconds) {
     std::string result;
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);
+
+    // Print initial timer line and prompt line
+    std::cout << "  " CLR_DIM "Time left:" CLR_RESET " " CLR_GREEN << seconds << "s  " CLR_RESET "\n";
+    std::cout << "  Your word: " << std::flush;
 
 #ifdef _WIN32
     HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
@@ -32,7 +42,6 @@ static std::string timed_input(int seconds) {
     while (true) {
         auto now = std::chrono::steady_clock::now();
         if (now >= deadline) {
-            // time up — print newline so output stays clean
             std::cout << "\n";
             SetConsoleMode(hStdin, mode);
             return "";
@@ -58,11 +67,18 @@ static std::string timed_input(int seconds) {
                     std::cout << c << std::flush;
                 }
             }
+        } else {
+            // No key — update the countdown display
+            now = std::chrono::steady_clock::now();
+            int secs_left = (int)std::chrono::duration_cast<std::chrono::seconds>(deadline - now).count();
+            if (secs_left < 0) secs_left = 0;
+            const char* color = secs_left > 5 ? CLR_GREEN : (secs_left > 2 ? CLR_YELLOW : CLR_RED);
+            std::cout << "\033[s\033[1A\r  " CLR_DIM "Time left:" CLR_RESET " "
+                      << color << secs_left << "s  " CLR_RESET "\033[u" << std::flush;
         }
     }
     SetConsoleMode(hStdin, mode);
 #else
-    // Unix: set non-blocking raw mode
     struct termios oldt, newt;
     tcgetattr(STDIN_FILENO, &oldt);
     newt = oldt;
@@ -87,7 +103,13 @@ static std::string timed_input(int seconds) {
                 result += c; std::cout << c << std::flush;
             }
         } else {
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            now = std::chrono::steady_clock::now();
+            int secs_left = (int)std::chrono::duration_cast<std::chrono::seconds>(deadline - now).count();
+            if (secs_left < 0) secs_left = 0;
+            const char* color = secs_left > 5 ? CLR_GREEN : (secs_left > 2 ? CLR_YELLOW : CLR_RED);
+            std::cout << "\033[s\033[1A\r  " CLR_DIM "Time left:" CLR_RESET " "
+                      << color << secs_left << "s  " CLR_RESET "\033[u" << std::flush;
         }
     }
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
@@ -95,21 +117,7 @@ static std::string timed_input(int seconds) {
     return result;
 }
 
-static std::string to_lower(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
-    return s;
-}
-
-static void print_timer_bar(int elapsed_ms, int total_ms) {
-    const int WIDTH = 30;
-    int filled = WIDTH - (int)((double)elapsed_ms / total_ms * WIDTH);
-    if (filled < 0) filled = 0;
-    std::cout << "[";
-    for (int i = 0; i < WIDTH; ++i) std::cout << (i < filled ? "=" : " ");
-    std::cout << "] " << (total_ms - elapsed_ms) / 1000 << "s  \r" << std::flush;
-}
-
-// ── main chain reaction loop ──────────────────────────────
+// Main chain reaction loop
 std::vector<ChainEntry> run_chain_reaction(sqlite3* db, int timer_sec, int min_chain) {
     std::vector<ChainEntry> chain;
 
@@ -118,14 +126,11 @@ std::vector<ChainEntry> run_chain_reaction(sqlite3* db, int timer_sec, int min_c
         return chain;
     }
 
-    std::cout << "\n╔══════════════════════════════════════╗\n";
-    std::cout << "║       CHAIN REACTION ENGINE          ║\n";
-    std::cout << "╚══════════════════════════════════════╝\n";
+    std::cout << "\n" CLR_BLUE CLR_BOLD "=== Chain Reaction Engine ===" CLR_RESET "\n";
     std::cout << "  Type a word associated with the prompt.\n";
     std::cout << "  You have " << timer_sec << " seconds per word.\n";
     std::cout << "  After " << min_chain << " links, press Enter on an empty line to stop.\n\n";
 
-    // Pick a random anchor word
     int anchor_id = wordpool_random_id(db);
     std::string anchor = wordpool_get_text(db, anchor_id);
 
@@ -133,21 +138,17 @@ std::vector<ChainEntry> run_chain_reaction(sqlite3* db, int timer_sec, int min_c
     bool running = true;
 
     while (running) {
-        std::cout << "\n  [" << seq << "] Anchor word: >> " << anchor << " <<\n";
-        std::cout << "  Your word: ";
+        std::cout << "\n  " CLR_BLUE "[" << seq << "]" CLR_RESET " Anchor: "
+                  CLR_CYAN CLR_BOLD << anchor << CLR_RESET "\n";
 
         auto start = std::chrono::steady_clock::now();
-
-        // Show a simple countdown while waiting — print bar before reading
-        // (timed_input blocks but we run it directly — bar is approximate)
         std::string input = timed_input(timer_sec);
-
         auto end = std::chrono::steady_clock::now();
         int elapsed_ms = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
         // Time ran out
         if (input.empty() && elapsed_ms >= timer_sec * 1000 - 200) {
-            std::cout << "\n  ✗ Time's up! Chain ends at " << seq - 1 << " links.\n";
+            std::cout << "\n  " CLR_RED "X" CLR_RESET " Time's up! Chain ends at " << seq - 1 << " links.\n";
             break;
         }
 
@@ -157,11 +158,10 @@ std::vector<ChainEntry> run_chain_reaction(sqlite3* db, int timer_sec, int min_c
                 std::cout << "  Chain complete! " << chain.size() << " links forged.\n";
             } else {
                 std::cout << "  [!] You need at least " << min_chain << " links before stopping.\n";
-                std::cout << "  Anchor word: >> " << anchor << " <<\n";
-                std::cout << "  Your word: ";
+                std::cout << "  Anchor: " CLR_CYAN CLR_BOLD << anchor << CLR_RESET "\n";
                 input = timed_input(timer_sec);
                 if (input.empty()) {
-                    std::cout << "\n  ✗ Time's up!\n";
+                    std::cout << "\n  " CLR_RED "X" CLR_RESET " Time's up!\n";
                     break;
                 }
             }
@@ -169,7 +169,6 @@ std::vector<ChainEntry> run_chain_reaction(sqlite3* db, int timer_sec, int min_c
         }
 
         std::string word = to_lower(input);
-        // Trim whitespace
         while (!word.empty() && std::isspace((unsigned char)word.front())) word.erase(word.begin());
         while (!word.empty() && std::isspace((unsigned char)word.back()))  word.pop_back();
 
@@ -179,27 +178,27 @@ std::vector<ChainEntry> run_chain_reaction(sqlite3* db, int timer_sec, int min_c
             continue;
         }
 
-        // Get or add the word to pool
-        int word_id = wordpool_get_or_insert(db, word, "user");
+        int word_id = wordpool_get_or_insert(db, word, 0);
 
         ChainEntry entry;
+        entry.anchor_text = anchor;
         entry.word    = word;
         entry.word_id = word_id;
         entry.time_ms = elapsed_ms;
         chain.push_back(entry);
 
-        std::cout << "  ✓ Link forged in " << elapsed_ms << " ms\n";
+        std::cout << "  " CLR_GREEN "+" CLR_RESET " Link forged in " << elapsed_ms << " ms\n";
 
-        // The word just typed becomes the new anchor
-        anchor = word;
+        anchor_id = wordpool_random_id(db);
+        anchor = wordpool_get_text(db, anchor_id);
         seq++;
     }
 
     if (!chain.empty()) {
-        std::cout << "\n  ── Word Chain ──\n  ";
+        std::cout << "\n  " CLR_BLUE CLR_BOLD "-- Word Chain --" CLR_RESET "\n  ";
         for (size_t i = 0; i < chain.size(); ++i) {
-            if (i > 0) std::cout << " → ";
-            std::cout << chain[i].word;
+            if (i > 0) std::cout << " -> ";
+            std::cout << CLR_DIM << chain[i].anchor_text << CLR_RESET " -> " CLR_BOLD << chain[i].word << CLR_RESET;
         }
         std::cout << "\n";
     }

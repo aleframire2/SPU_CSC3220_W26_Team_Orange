@@ -1,4 +1,5 @@
 #include "flesch.h"
+#include "database.h"
 #include <cctype>
 #include <sstream>
 #include <algorithm>
@@ -39,6 +40,15 @@ int count_syllables(const std::string& raw) {
     return count;
 }
 
+// ── DB-backed syllable lookup ─────────────────────────────
+int count_syllables_db(sqlite3* db, const std::string& word) {
+    if (db) {
+        int syl = wordpool_get_syllable(db, word);
+        if (syl > 0) return syl;
+    }
+    return count_syllables(word);
+}
+
 // ── sentence counter ──────────────────────────────────────
 int count_sentences(const std::string& text) {
     int n = 0;
@@ -57,7 +67,7 @@ int count_words(const std::string& text) {
 }
 
 // ── Flesch Reading Ease ───────────────────────────────────
-double flesch_score(const std::string& text) {
+double flesch_score(const std::string& text, sqlite3* db) {
     int words = count_words(text);
     if (words == 0) return 0.0;
 
@@ -66,7 +76,7 @@ double flesch_score(const std::string& text) {
 
     std::istringstream ss(text);
     std::string tok;
-    while (ss >> tok) syllables += count_syllables(tok);
+    while (ss >> tok) syllables += count_syllables_db(db, tok);
 
     double asl = (double)words / sentences;        // avg sentence length
     double asw = (double)syllables / words;        // avg syllables per word

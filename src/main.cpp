@@ -1,12 +1,17 @@
 #include <iostream>
 #include <string>
 #include <limits>
+#ifdef _WIN32
+#include <windows.h>
+#endif
+#include "colors.h"
 #include "database.h"
 #include "chain_engine.h"
 #include "narrative.h"
 #include "archive.h"
 #include "analytics.h"
 #include "wordpool.h"
+#include "flesch.h"
 #include "export.h"
 
 // ── helpers ───────────────────────────────────────────────
@@ -31,10 +36,10 @@ static bool do_login(sqlite3* db, User& user) {
     std::cout << "  Last name:  "; std::string ln; std::getline(std::cin, ln);
     std::cout << "  Password:   "; std::string pw; std::getline(std::cin, pw);
     if (user_login(db, fn, ln, pw, user)) {
-        std::cout << "  Welcome back, " << user.firstName << "!\n";
+        std::cout << "  " CLR_GREEN "Welcome back, " CLR_CYAN << user.firstName << CLR_RESET "!\n";
         return true;
     }
-    std::cout << "  [!] Invalid credentials.\n";
+    std::cout << "  " CLR_RED "[!] Invalid credentials." CLR_RESET "\n";
     return false;
 }
 
@@ -43,15 +48,15 @@ static bool do_register(sqlite3* db, User& user) {
     std::cout << "  Last name:  "; std::string ln; std::getline(std::cin, ln);
     std::cout << "  Password:   "; std::string pw; std::getline(std::cin, pw);
     std::cout << "  Confirm:    "; std::string pw2; std::getline(std::cin, pw2);
-    if (pw != pw2) { std::cout << "  [!] Passwords do not match.\n"; return false; }
-    if (fn.empty() || ln.empty() || pw.empty()) { std::cout << "  [!] All fields required.\n"; return false; }
+    if (pw != pw2) { std::cout << "  " CLR_RED "[!] Passwords do not match." CLR_RESET "\n"; return false; }
+    if (fn.empty() || ln.empty() || pw.empty()) { std::cout << "  " CLR_RED "[!] All fields required." CLR_RESET "\n"; return false; }
 
     int id = user_create(db, fn, ln, pw);
     if (!user_login(db, fn, ln, pw, user)) {
-        std::cout << "  [!] Registration failed.\n";
+        std::cout << "  " CLR_RED "[!] Registration failed." CLR_RESET "\n";
         return false;
     }
-    std::cout << "  Account created! Welcome, " << user.firstName << ".\n";
+    std::cout << "  " CLR_GREEN "Account created! Welcome, " CLR_CYAN << user.firstName << CLR_RESET ".\n";
     return true;
 }
 
@@ -89,18 +94,16 @@ static void new_session(sqlite3* db, const User& user) {
 // ── main menu ─────────────────────────────────────────────
 static void main_menu(sqlite3* db, User& user) {
     while (true) {
-        std::cout << "\n╔══════════════════════════════════════╗\n";
-        std::cout << "║          NarrativeLink               ║\n";
-        std::cout << "║  Hello, " << user.firstName
-                  << std::string(28 - (int)user.firstName.size(), ' ') << "║\n";
-        std::cout << "╠══════════════════════════════════════╣\n";
-        std::cout << "║  [1] New Session                     ║\n";
-        std::cout << "║  [2] Local Archive (CRUD)            ║\n";
-        std::cout << "║  [3] Session Analytics               ║\n";
-        std::cout << "║  [4] Word Pool Manager               ║\n";
-        std::cout << "║  [5] Export Story                    ║\n";
-        std::cout << "║  [q] Quit                            ║\n";
-        std::cout << "╚══════════════════════════════════════╝\n  > ";
+        std::cout << "\n" CLR_BLUE CLR_BOLD "=== NarrativeLink ===" CLR_RESET "\n";
+        std::cout << "  Hello, " CLR_CYAN << user.firstName << CLR_RESET "\n";
+        std::cout << CLR_BLUE "---" CLR_RESET "\n";
+        std::cout << "  " CLR_GREEN "1." CLR_RESET " New Session\n";
+        std::cout << "  " CLR_GREEN "2." CLR_RESET " Local Archive (CRUD)\n";
+        std::cout << "  " CLR_GREEN "3." CLR_RESET " Session Analytics\n";
+        std::cout << "  " CLR_GREEN "4." CLR_RESET " Word Pool Manager\n";
+        std::cout << "  " CLR_GREEN "5." CLR_RESET " Export Story\n";
+        std::cout << "  " CLR_RED "q." CLR_RESET " Quit\n";
+        std::cout << CLR_CYAN "  > " CLR_RESET;
 
         std::string cmd;
         std::getline(std::cin, cmd);
@@ -119,29 +122,35 @@ static void main_menu(sqlite3* db, User& user) {
 
 // ── entry point ───────────────────────────────────────────
 int main() {
-    // Resolve DB path relative to executable
+#ifdef _WIN32
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD mode = 0;
+    GetConsoleMode(hOut, &mode);
+    SetConsoleMode(hOut, mode | 0x0004);
+#endif
+
     const std::string db_path = "narrativelink.db";
 
     sqlite3* db = nullptr;
     try {
         db = db_open(db_path);
         db_init_schema(db);
-        seed_default_words(db);
     } catch (const std::exception& e) {
-        std::cerr << "[FATAL] " << e.what() << "\n";
+        std::cerr << CLR_RED "[FATAL] " << e.what() << CLR_RESET "\n";
         return 1;
     }
 
-    std::cout << "╔══════════════════════════════════════╗\n";
-    std::cout << "║          NarrativeLink               ║\n";
-    std::cout << "║   Gamified Creative Writing CLI      ║\n";
-    std::cout << "╚══════════════════════════════════════╝\n";
+    std::cout << "\n" CLR_BLUE CLR_BOLD "=== NarrativeLink ===" CLR_RESET "\n";
+    std::cout << CLR_DIM "    Gamified Creative Writing CLI" CLR_RESET "\n";
 
     User user{};
     bool logged_in = false;
 
     while (!logged_in) {
-        std::cout << "\n  [1] Login\n  [2] Register\n  [q] Quit\n  > ";
+        std::cout << "\n  " CLR_GREEN "1." CLR_RESET " Login\n";
+        std::cout << "  " CLR_GREEN "2." CLR_RESET " Register\n";
+        std::cout << "  " CLR_RED "q." CLR_RESET " Quit\n";
+        std::cout << CLR_CYAN "  > " CLR_RESET;
         std::string opt;
         std::getline(std::cin, opt);
 

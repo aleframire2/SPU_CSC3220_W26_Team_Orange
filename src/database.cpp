@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS WORDCHAIN (
 CREATE TABLE IF NOT EXISTS WORDPOOL (
     word_id   INTEGER PRIMARY KEY AUTOINCREMENT,
     word_text TEXT    UNIQUE NOT NULL,
-    category  TEXT
+    syllable  INTEGER DEFAULT 0
 );)");
     exec(db, R"(
 CREATE TABLE IF NOT EXISTS CHAINWORD (
@@ -278,18 +278,18 @@ std::vector<ChainWord> chainword_list(sqlite3* db, int chain_id) {
 }
 
 // ── WORDPOOL ──────────────────────────────────────────────
-int wordpool_insert(sqlite3* db, const std::string& word, const std::string& category) {
+int wordpool_insert(sqlite3* db, const std::string& word, int syllable) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db,
-        "INSERT OR IGNORE INTO WORDPOOL(word_text,category) VALUES(?,?);", -1, &s, nullptr);
-    sqlite3_bind_text(s, 1, word.c_str(),     -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(s, 2, category.c_str(), -1, SQLITE_TRANSIENT);
+        "INSERT OR IGNORE INTO WORDPOOL(word_text,syllable) VALUES(?,?);", -1, &s, nullptr);
+    sqlite3_bind_text(s, 1, word.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(s,  2, syllable);
     sqlite3_step(s);
     sqlite3_finalize(s);
     return (int)sqlite3_last_insert_rowid(db);
 }
 
-int wordpool_get_or_insert(sqlite3* db, const std::string& word, const std::string& category) {
+int wordpool_get_or_insert(sqlite3* db, const std::string& word, int syllable) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db,
         "SELECT word_id FROM WORDPOOL WHERE word_text=? LIMIT 1;", -1, &s, nullptr);
@@ -298,7 +298,7 @@ int wordpool_get_or_insert(sqlite3* db, const std::string& word, const std::stri
     if (sqlite3_step(s) == SQLITE_ROW) id = sqlite3_column_int(s, 0);
     sqlite3_finalize(s);
     if (id != -1) return id;
-    return wordpool_insert(db, word, category);
+    return wordpool_insert(db, word, syllable);
 }
 
 int wordpool_random_id(sqlite3* db) {
@@ -323,16 +323,28 @@ std::string wordpool_get_text(sqlite3* db, int word_id) {
     return txt;
 }
 
+int wordpool_get_syllable(sqlite3* db, const std::string& word) {
+    sqlite3_stmt* s;
+    sqlite3_prepare_v2(db,
+        "SELECT syllable FROM WORDPOOL WHERE LOWER(word_text) = LOWER(?) LIMIT 1;",
+        -1, &s, nullptr);
+    sqlite3_bind_text(s, 1, word.c_str(), -1, SQLITE_TRANSIENT);
+    int syl = 0;
+    if (sqlite3_step(s) == SQLITE_ROW) syl = sqlite3_column_int(s, 0);
+    sqlite3_finalize(s);
+    return syl;
+}
+
 std::vector<WordPool> wordpool_all(sqlite3* db) {
     std::vector<WordPool> v;
     sqlite3_stmt* s;
-    sqlite3_prepare_v2(db, "SELECT word_id,word_text,category FROM WORDPOOL ORDER BY word_text;",
+    sqlite3_prepare_v2(db, "SELECT word_id,word_text,syllable FROM WORDPOOL ORDER BY word_text;",
         -1, &s, nullptr);
     while (sqlite3_step(s) == SQLITE_ROW) {
         WordPool w;
         w.word_id   = sqlite3_column_int(s, 0);
         w.word_text = (const char*)sqlite3_column_text(s, 1);
-        w.category  = sqlite3_column_text(s, 2) ? (const char*)sqlite3_column_text(s, 2) : "";
+        w.syllable  = sqlite3_column_int(s, 2);
         v.push_back(w);
     }
     sqlite3_finalize(s);

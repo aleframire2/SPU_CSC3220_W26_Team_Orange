@@ -27,3 +27,11 @@ target_link_libraries(narrativelink PRIVATE sqlite3)
 if(WIN32)
     target_link_libraries(narrativelink PRIVATE ws2_32)
 endif()
+
+# Ship the pre-populated database with 135k words from cmudict
+file(COPY ${CMAKE_SOURCE_DIR}/Database/database.db
+     DESTINATION ${CMAKE_BINARY_DIR})
+# Rename to narrativelink.db only if it doesn't already exist (preserve user data)
+if(NOT EXISTS ${CMAKE_BINARY_DIR}/narrativelink.db)
+    file(RENAME ${CMAKE_BINARY_DIR}/database.db ${CMAKE_BINARY_DIR}/narrativelink.db)
+endif()
