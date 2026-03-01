@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS CHAINWORD (
     chain_id       INTEGER NOT NULL,
     sequence_order INTEGER NOT NULL,
     word_id        INTEGER NOT NULL,
+    anchor_word_id INTEGER,  -- word shown to user (for session analytics)
     time_taken_ms  INTEGER,
     PRIMARY KEY (chain_id, sequence_order),
     FOREIGN KEY (chain_id) REFERENCES WORDCHAIN(chain_id) ON DELETE CASCADE,
