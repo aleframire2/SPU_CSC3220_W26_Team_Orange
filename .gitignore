@@ -1,0 +1,5 @@
+build/
+narrativelink.db
+narrativelink.db-shm
+narrativelink.db-wal
+*.exe
