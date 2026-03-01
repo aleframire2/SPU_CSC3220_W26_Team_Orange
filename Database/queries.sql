@@ -81,3 +81,20 @@ BEGIN TRANSACTION;
     WHERE  story_id = 5;
 
 COMMIT;
+
+
+-- ============================================================
+-- WORDPOOL: Verify dictionary is populated (after loading cmudict)
+-- ============================================================
+
+-- Total number of words in the pool
+SELECT COUNT(*) AS total_words FROM WORDPOOL;
+
+-- Sample rows (first 10)
+SELECT word_id, word_text, syllable FROM WORDPOOL LIMIT 10;
+
+-- Look up a specific word (e.g. abacus = 3 syllables)
+SELECT word_id, word_text, syllable FROM WORDPOOL WHERE word_text = 'abacus';
+
+-- Words by syllable count (summary)
+SELECT syllable, COUNT(*) AS count FROM WORDPOOL GROUP BY syllable ORDER BY syllable;

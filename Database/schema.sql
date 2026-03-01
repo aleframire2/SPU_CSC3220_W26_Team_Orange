@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS WORDCHAIN (
 CREATE TABLE IF NOT EXISTS WORDPOOL (
     word_id   INTEGER PRIMARY KEY AUTOINCREMENT,
     word_text TEXT    UNIQUE NOT NULL,
-    category  TEXT
+    syllable  INTEGER
 );
 
 -- ============================================================
