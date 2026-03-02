@@ -1,3 +1,4 @@
+// narrative.h -- multi-line story editor session interface
 #pragma once
 #include <string>
 #include <vector>

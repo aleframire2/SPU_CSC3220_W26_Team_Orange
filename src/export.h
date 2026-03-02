@@ -1,3 +1,4 @@
+// export.h -- story export to .txt or .md
 #pragma once
 #include "sqlite3.h"
 

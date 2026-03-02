@@ -1,3 +1,4 @@
+// export.cpp -- story export to .txt and .md
 #include "export.h"
 #include "database.h"
 #include "colors.h"
@@ -6,6 +7,7 @@
 #include <string>
 #include <iomanip>
 
+// Writes story as plain text with metadata header.
 static bool write_txt(const Story& s, const std::string& path) {
     std::ofstream f(path);
     if (!f.is_open()) return false;
@@ -18,6 +20,7 @@ static bool write_txt(const Story& s, const std::string& path) {
     return true;
 }
 
+// Writes story as Markdown with optional word chain section.
 static bool write_md(const Story& s, const std::vector<ChainWord>& chain, const std::string& path) {
     std::ofstream f(path);
     if (!f.is_open()) return false;
@@ -42,6 +45,7 @@ static bool write_md(const Story& s, const std::vector<ChainWord>& chain, const 
     return true;
 }
 
+// Lists user's stories, prompts for ID and format (.txt/.md), writes to file.
 void run_export_menu(sqlite3* db, int user_id) {
     auto stories = story_list(db, user_id);
     if (stories.empty()) {
@@ -70,7 +74,7 @@ void run_export_menu(sqlite3* db, int user_id) {
     std::getline(std::cin, fmt);
 
     std::string out_path = s.title;
-    for (char& c : out_path) if (c == ' ' || c == '/') c = '_';
+    for (char& c : out_path) if (c == ' ' || c == '/') c = '_';  // sanitize filename
 
     bool ok = false;
     if (fmt == "2") {

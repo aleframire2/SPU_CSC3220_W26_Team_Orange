@@ -1,3 +1,4 @@
+// wordpool.cpp -- word pool import from .txt and interactive menu
 #include "wordpool.h"
 #include "database.h"
 #include "colors.h"
@@ -7,17 +8,20 @@
 #include <algorithm>
 #include <cctype>
 
+// Removes leading and trailing whitespace.
 static std::string trim(std::string s) {
     while (!s.empty() && std::isspace((unsigned char)s.front())) s.erase(s.begin());
     while (!s.empty() && std::isspace((unsigned char)s.back()))  s.pop_back();
     return s;
 }
 
+// Converts string to lowercase.
 static std::string to_lower(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(), ::tolower);
     return s;
 }
 
+// Parses .txt (one word per line), inserts into WORDPOOL; lines starting with # are skipped.
 int import_wordpool_file(sqlite3* db, const std::string& filepath) {
     std::ifstream f(filepath);
     if (!f.is_open()) {
@@ -30,7 +34,7 @@ int import_wordpool_file(sqlite3* db, const std::string& filepath) {
     while (std::getline(f, line)) {
         std::string word = to_lower(trim(line));
         if (word.empty()) continue;
-        if (word[0] == '#') continue;
+        if (word[0] == '#') continue;  // comment lines
 
         sqlite3_stmt* s;
         sqlite3_prepare_v2(db,
@@ -44,6 +48,7 @@ int import_wordpool_file(sqlite3* db, const std::string& filepath) {
     return added;
 }
 
+// Interactive menu: import .txt, list words (capped at 100 shown).
 void run_wordpool_menu(sqlite3* db) {
     while (true) {
         int count = wordpool_count(db);

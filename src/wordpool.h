@@ -1,3 +1,4 @@
+// wordpool.h -- word pool import and menu API
 #pragma once
 #include <string>
 #include "sqlite3.h"

@@ -1,3 +1,4 @@
+// narrative.cpp -- multi-line story editor session, saves to DB with Flesch stats
 #include "narrative.h"
 #include "database.h"
 #include "flesch.h"
@@ -6,6 +7,7 @@
 #include <string>
 #include <chrono>
 
+// Opens multi-line editor, accepts :done, :title, saves story + chain to DB, returns story_id.
 int run_narrative_session(sqlite3* db, int user_id, const std::vector<ChainEntry>& chain) {
     std::cout << "\n" CLR_BLUE CLR_BOLD "=== NARRATIVE SYNTHESIS ===" CLR_RESET "\n";
     std::cout << "  Write your story incorporating the words below.\n";
@@ -30,7 +32,7 @@ int run_narrative_session(sqlite3* db, int user_id, const std::vector<ChainEntry
 
         if (line == ":done") break;
 
-        if (line.rfind(":title ", 0) == 0) {
+        if (line.rfind(":title ", 0) == 0) {  // starts-with check
             title = line.substr(7);
             std::cout << "  " CLR_DIM "[Title set to: " << title << "]" CLR_RESET "\n";
             continue;

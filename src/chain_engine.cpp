@@ -1,3 +1,4 @@
+// chain_engine.cpp -- timed word-association chain game with cross-platform console I/O
 #include "chain_engine.h"
 #include "colors.h"
 #include "database.h"
@@ -18,6 +19,7 @@
 #include <fcntl.h>
 #endif
 
+// Converts string to lowercase in-place.
 static std::string to_lower(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(), ::tolower);
     return s;
@@ -34,6 +36,7 @@ static std::string timed_input(int seconds) {
     std::cout << "  Your word: " << std::flush;
 
 #ifdef _WIN32
+    // Raw console mode: no line buffering, no echo (we handle keystrokes manually)
     HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
     DWORD  mode;
     GetConsoleMode(hStdin, &mode);
@@ -68,7 +71,7 @@ static std::string timed_input(int seconds) {
                 }
             }
         } else {
-            // No key — update the countdown display
+            // No key — update countdown: \033[s save cursor, \033[1A move up 1 line, \r rewind, \033[u restore
             now = std::chrono::steady_clock::now();
             int secs_left = (int)std::chrono::duration_cast<std::chrono::seconds>(deadline - now).count();
             if (secs_left < 0) secs_left = 0;
@@ -79,6 +82,7 @@ static std::string timed_input(int seconds) {
     }
     SetConsoleMode(hStdin, mode);
 #else
+    // Raw terminal: no canonical mode, no echo, non-blocking read
     struct termios oldt, newt;
     tcgetattr(STDIN_FILENO, &oldt);
     newt = oldt;
@@ -108,6 +112,7 @@ static std::string timed_input(int seconds) {
             int secs_left = (int)std::chrono::duration_cast<std::chrono::seconds>(deadline - now).count();
             if (secs_left < 0) secs_left = 0;
             const char* color = secs_left > 5 ? CLR_GREEN : (secs_left > 2 ? CLR_YELLOW : CLR_RED);
+            // ANSI: save cursor, move up 1 line, rewind, update timer, restore cursor
             std::cout << "\033[s\033[1A\r  " CLR_DIM "Time left:" CLR_RESET " "
                       << color << secs_left << "s  " CLR_RESET "\033[u" << std::flush;
         }
@@ -146,7 +151,7 @@ std::vector<ChainEntry> run_chain_reaction(sqlite3* db, int timer_sec, int min_c
         auto end = std::chrono::steady_clock::now();
         int elapsed_ms = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-        // Time ran out
+        // Time ran out (200ms tolerance: empty input + near-full elapsed time = timeout)
         if (input.empty() && elapsed_ms >= timer_sec * 1000 - 200) {
             std::cout << "\n  " CLR_RED "X" CLR_RESET " Time's up! Chain ends at " << seq - 1 << " links.\n";
             break;

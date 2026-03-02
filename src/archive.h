@@ -1,5 +1,6 @@
+// archive.h -- Archive browser and CRUD interface for user stories
 #pragma once
 #include "sqlite3.h"
 
-// Interactive archive browser and CRUD menu for the current user.
+// Starts the interactive archive menu for the given user.
 void run_archive(sqlite3* db, int user_id);

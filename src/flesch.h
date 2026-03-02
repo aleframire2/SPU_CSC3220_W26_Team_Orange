@@ -1,3 +1,4 @@
+// flesch.h -- Flesch Reading Ease and syllable/sentence/word counting
 #pragma once
 #include <string>
 #include "sqlite3.h"

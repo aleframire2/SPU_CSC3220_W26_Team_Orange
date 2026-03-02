@@ -1,3 +1,4 @@
+// main.cpp -- CLI entry point and menu flow for NarrativeLink
 #include <iostream>
 #include <string>
 #include <limits>
@@ -15,6 +16,7 @@
 #include "export.h"
 
 // ── helpers ───────────────────────────────────────────────
+// Reads a line from stdin after printing the label.
 static std::string prompt(const std::string& label) {
     std::cout << "  " << label << ": ";
     std::string s;
@@ -22,6 +24,7 @@ static std::string prompt(const std::string& label) {
     return s;
 }
 
+// Clears terminal (cls on Windows, clear elsewhere).
 static void clear_screen() {
 #ifdef _WIN32
     system("cls");
@@ -31,6 +34,7 @@ static void clear_screen() {
 }
 
 // ── auth ──────────────────────────────────────────────────
+// Prompts for credentials and populates user on success.
 static bool do_login(sqlite3* db, User& user) {
     std::cout << "\n  First name: "; std::string fn; std::getline(std::cin, fn);
     std::cout << "  Last name:  "; std::string ln; std::getline(std::cin, ln);
@@ -43,6 +47,7 @@ static bool do_login(sqlite3* db, User& user) {
     return false;
 }
 
+// Prompts for name and password, creates account, and logs in.
 static bool do_register(sqlite3* db, User& user) {
     std::cout << "\n  First name: "; std::string fn; std::getline(std::cin, fn);
     std::cout << "  Last name:  "; std::string ln; std::getline(std::cin, ln);
@@ -61,6 +66,7 @@ static bool do_register(sqlite3* db, User& user) {
 }
 
 // ── new session ───────────────────────────────────────────
+// Runs chain reaction timer, then optionally narrative synthesis.
 static void new_session(sqlite3* db, const User& user) {
     std::cout << "\n  Timer seconds per word [default 10]: ";
     std::string t_str;
@@ -92,6 +98,7 @@ static void new_session(sqlite3* db, const User& user) {
 }
 
 // ── main menu ─────────────────────────────────────────────
+// Main app loop: session, archive, analytics, word pool, export.
 static void main_menu(sqlite3* db, User& user) {
     while (true) {
         std::cout << "\n" CLR_BLUE CLR_BOLD "=== NarrativeLink ===" CLR_RESET "\n";
@@ -121,6 +128,7 @@ static void main_menu(sqlite3* db, User& user) {
 }
 
 // ── entry point ───────────────────────────────────────────
+// Opens DB, login/register loop, then main menu.
 int main() {
 #ifdef _WIN32
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);

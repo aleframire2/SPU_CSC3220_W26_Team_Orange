@@ -1,3 +1,4 @@
+// colors.h -- ANSI escape codes for terminal text styling
 #pragma once
 
 #define CLR_RESET   "\033[0m"

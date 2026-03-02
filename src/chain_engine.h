@@ -1,3 +1,4 @@
+// chain_engine.h -- word-association chain game engine interface
 #pragma once
 #include <string>
 #include <vector>

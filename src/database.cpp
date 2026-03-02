@@ -1,8 +1,9 @@
+// database.cpp -- implementation of database operations
 #include "database.h"
 #include <iostream>
 #include <stdexcept>
 
-// ── helpers ───────────────────────────────────────────────
+// Throws on sqlite3_exec failure
 static void exec(sqlite3* db, const char* sql) {
     char* err = nullptr;
     if (sqlite3_exec(db, sql, nullptr, nullptr, &err) != SQLITE_OK) {
@@ -13,6 +14,7 @@ static void exec(sqlite3* db, const char* sql) {
 }
 
 // ── DB lifecycle ──────────────────────────────────────────
+// Opens DB, enables WAL and foreign keys
 sqlite3* db_open(const std::string& path) {
     sqlite3* db = nullptr;
     if (sqlite3_open(path.c_str(), &db) != SQLITE_OK)
@@ -24,6 +26,7 @@ sqlite3* db_open(const std::string& path) {
 
 void db_close(sqlite3* db) { sqlite3_close(db); }
 
+// Creates USER, STORY, WORDCHAIN, WORDPOOL, CHAINWORD (composite key on chain_id+sequence_order)
 void db_init_schema(sqlite3* db) {
     exec(db, R"(
 CREATE TABLE IF NOT EXISTS USER (
@@ -72,6 +75,7 @@ CREATE TABLE IF NOT EXISTS CHAINWORD (
 }
 
 // ── USER ──────────────────────────────────────────────────
+// Inserts user, returns user_id
 int user_create(sqlite3* db, const std::string& first, const std::string& last, const std::string& pw) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db,
@@ -84,6 +88,7 @@ int user_create(sqlite3* db, const std::string& first, const std::string& last, 
     return (int)sqlite3_last_insert_rowid(db);
 }
 
+// Authenticates by first+last+password, fills User on success
 bool user_login(sqlite3* db, const std::string& first, const std::string& last,
                 const std::string& pw, User& out) {
     sqlite3_stmt* s;
@@ -107,6 +112,7 @@ bool user_login(sqlite3* db, const std::string& first, const std::string& last,
     return found;
 }
 
+// Recomputes fleschScoreAvg from user's stories (excludes flesch_score <= 0)
 void user_update_flesch_avg(sqlite3* db, int user_id) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db,
@@ -120,6 +126,7 @@ void user_update_flesch_avg(sqlite3* db, int user_id) {
 }
 
 // ── STORY ─────────────────────────────────────────────────
+// Inserts story, returns story_id
 int story_create(sqlite3* db, int user_id, const std::string& title,
                  const std::string& content, int wc, int ts, double fl) {
     sqlite3_stmt* s;
@@ -137,6 +144,7 @@ int story_create(sqlite3* db, int user_id, const std::string& title,
     return (int)sqlite3_last_insert_rowid(db);
 }
 
+// Fetches story by id
 bool story_get(sqlite3* db, int story_id, Story& out) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db,
@@ -159,6 +167,7 @@ bool story_get(sqlite3* db, int story_id, Story& out) {
     return found;
 }
 
+// Lists user's stories, newest first
 std::vector<Story> story_list(sqlite3* db, int user_id) {
     std::vector<Story> v;
     sqlite3_stmt* s;
@@ -182,6 +191,7 @@ std::vector<Story> story_list(sqlite3* db, int user_id) {
     return v;
 }
 
+// Updates story metadata
 bool story_update(sqlite3* db, int story_id, const std::string& title,
                   const std::string& content, int wc, int ts, double fl) {
     sqlite3_stmt* s;
@@ -206,6 +216,7 @@ bool story_update(sqlite3* db, int story_id, const std::string& title,
     return rc == SQLITE_DONE;
 }
 
+// Deletes story (cascades to WORDCHAIN, CHAINWORD)
 bool story_delete(sqlite3* db, int story_id) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db, "DELETE FROM STORY WHERE story_id=?;", -1, &s, nullptr);
@@ -216,6 +227,7 @@ bool story_delete(sqlite3* db, int story_id) {
 }
 
 // ── WORDCHAIN ─────────────────────────────────────────────
+// Creates chain for story, returns chain_id
 int wordchain_create(sqlite3* db, int story_id) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db, "INSERT INTO WORDCHAIN(story_id) VALUES(?);", -1, &s, nullptr);
@@ -225,6 +237,7 @@ int wordchain_create(sqlite3* db, int story_id) {
     return (int)sqlite3_last_insert_rowid(db);
 }
 
+// Fetches chain by story_id (one-to-one)
 bool wordchain_get_by_story(sqlite3* db, int story_id, WordChain& out) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db,
@@ -243,6 +256,7 @@ bool wordchain_get_by_story(sqlite3* db, int story_id, WordChain& out) {
 }
 
 // ── CHAINWORD ─────────────────────────────────────────────
+// INSERT OR IGNORE avoids duplicate (chain_id, sequence_order)
 void chainword_insert(sqlite3* db, int chain_id, int seq, int word_id, int ms) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db,
@@ -256,6 +270,7 @@ void chainword_insert(sqlite3* db, int chain_id, int seq, int word_id, int ms) {
     sqlite3_finalize(s);
 }
 
+// Returns chain words with word_text joined from WORDPOOL, ordered by sequence
 std::vector<ChainWord> chainword_list(sqlite3* db, int chain_id) {
     std::vector<ChainWord> v;
     sqlite3_stmt* s;
@@ -278,6 +293,7 @@ std::vector<ChainWord> chainword_list(sqlite3* db, int chain_id) {
 }
 
 // ── WORDPOOL ──────────────────────────────────────────────
+// Inserts word (OR IGNORE if exists), returns word_id
 int wordpool_insert(sqlite3* db, const std::string& word, int syllable) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db,
@@ -289,6 +305,7 @@ int wordpool_insert(sqlite3* db, const std::string& word, int syllable) {
     return (int)sqlite3_last_insert_rowid(db);
 }
 
+// Returns existing word_id or inserts and returns new id
 int wordpool_get_or_insert(sqlite3* db, const std::string& word, int syllable) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db,
@@ -301,6 +318,7 @@ int wordpool_get_or_insert(sqlite3* db, const std::string& word, int syllable) {
     return wordpool_insert(db, word, syllable);
 }
 
+// Returns random word_id, or -1 if pool empty
 int wordpool_random_id(sqlite3* db) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db,
@@ -311,6 +329,7 @@ int wordpool_random_id(sqlite3* db) {
     return id;
 }
 
+// Fetches word text by id
 std::string wordpool_get_text(sqlite3* db, int word_id) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db,
@@ -323,6 +342,7 @@ std::string wordpool_get_text(sqlite3* db, int word_id) {
     return txt;
 }
 
+// Case-insensitive syllable lookup
 int wordpool_get_syllable(sqlite3* db, const std::string& word) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db,
@@ -335,6 +355,7 @@ int wordpool_get_syllable(sqlite3* db, const std::string& word) {
     return syl;
 }
 
+// Returns all words sorted by word_text
 std::vector<WordPool> wordpool_all(sqlite3* db) {
     std::vector<WordPool> v;
     sqlite3_stmt* s;
@@ -351,6 +372,7 @@ std::vector<WordPool> wordpool_all(sqlite3* db) {
     return v;
 }
 
+// Returns total word count in pool
 int wordpool_count(sqlite3* db) {
     sqlite3_stmt* s;
     sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM WORDPOOL;", -1, &s, nullptr);

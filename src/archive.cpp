@@ -1,3 +1,4 @@
+// archive.cpp -- Implements archive browser UI and story CRUD operations
 #include "archive.h"
 #include "database.h"
 #include "flesch.h"
@@ -6,6 +7,7 @@
 #include <string>
 #include <iomanip>
 
+// Prints a formatted table of stories (ID, title, words, time, Flesch score).
 static void print_story_list(const std::vector<Story>& stories) {
     if (stories.empty()) {
         std::cout << "  " CLR_DIM "(no stories yet)" CLR_RESET "\n";
@@ -30,6 +32,7 @@ static void print_story_list(const std::vector<Story>& stories) {
     }
 }
 
+// Displays full story content and associated word chain.
 static void view_story(sqlite3* db, int story_id) {
     Story s;
     if (!story_get(db, story_id, s)) {
@@ -56,6 +59,7 @@ static void view_story(sqlite3* db, int story_id) {
     }
 }
 
+// Prompts for title/content edits; use :done on its own line to finish content input.
 static void edit_story(sqlite3* db, int story_id) {
     Story s;
     if (!story_get(db, story_id, s)) {
@@ -89,6 +93,7 @@ static void edit_story(sqlite3* db, int story_id) {
     std::cout << "  " CLR_GREEN "Story updated." CLR_RESET " New Flesch score: " << std::fixed << std::setprecision(1) << fl << "\n";
 }
 
+// Main archive menu loop: list stories, view/edit/delete by ID.
 void run_archive(sqlite3* db, int user_id) {
     while (true) {
         std::cout << "\n" CLR_BLUE CLR_BOLD "=== LOCAL ARCHIVE ===" CLR_RESET "\n";

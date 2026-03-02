@@ -1,3 +1,4 @@
+// analytics.cpp -- Aggregates and displays session stats and chain metrics
 #include "analytics.h"
 #include "database.h"
 #include "colors.h"
@@ -8,6 +9,7 @@
 #include <algorithm>
 #include <string>
 
+// Prints session analytics: story counts, chain links, avg linking speed, top 10 anchor words.
 void run_analytics(sqlite3* db, int user_id) {
     std::cout << "\n" CLR_BLUE CLR_BOLD "=== SESSION ANALYTICS ===" CLR_RESET "\n";
 

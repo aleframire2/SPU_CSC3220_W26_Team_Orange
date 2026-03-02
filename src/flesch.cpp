@@ -1,3 +1,4 @@
+// flesch.cpp -- Flesch score and syllable counting implementation
 #include "flesch.h"
 #include "database.h"
 #include <cctype>
@@ -40,7 +41,7 @@ int count_syllables(const std::string& raw) {
     return count;
 }
 
-// ── DB-backed syllable lookup ─────────────────────────────
+// DB lookup with heuristic fallback when db is null or word not in pool
 int count_syllables_db(sqlite3* db, const std::string& word) {
     if (db) {
         int syl = wordpool_get_syllable(db, word);
@@ -49,7 +50,7 @@ int count_syllables_db(sqlite3* db, const std::string& word) {
     return count_syllables(word);
 }
 
-// ── sentence counter ──────────────────────────────────────
+// Splits on . ! ?; returns 1 if none (avoids div-by-zero in Flesch)
 int count_sentences(const std::string& text) {
     int n = 0;
     for (char c : text)
@@ -57,7 +58,7 @@ int count_sentences(const std::string& text) {
     return n > 0 ? n : 1;
 }
 
-// ── word counter ──────────────────────────────────────────
+// Whitespace-delimited token count
 int count_words(const std::string& text) {
     std::istringstream ss(text);
     std::string tok;
@@ -66,7 +67,7 @@ int count_words(const std::string& text) {
     return n;
 }
 
-// ── Flesch Reading Ease ───────────────────────────────────
+// 206.835 - 1.015*ASL - 84.6*ASW; clamped to 0–100
 double flesch_score(const std::string& text, sqlite3* db) {
     int words = count_words(text);
     if (words == 0) return 0.0;
@@ -83,7 +84,7 @@ double flesch_score(const std::string& text, sqlite3* db) {
 
     double score = 206.835 - 1.015 * asl - 84.6 * asw;
 
-    // Clamp to 0–100
+    // Clamp to 0–100 (raw formula can exceed range)
     if (score < 0)   score = 0;
     if (score > 100) score = 100;
     return score;
